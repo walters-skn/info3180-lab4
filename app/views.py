@@ -8,11 +8,23 @@ import os
 from app import app
 from flask import render_template, request, redirect, url_for, flash, session, abort
 from werkzeug.utils import secure_filename
-
+from .forms import UploadForm
+from flask.helpers import send_from_directory
 
 ###
 # Routing for your application.
 ###
+
+def get_uploaded_images():
+
+    filee = list()
+    rootdir = os.path.join(app.config['UPLOAD_FOLDER'])
+
+    for subdir, dirs, files in os.walk(rootdir):
+        for file in files:
+            filee.append(file)
+
+    return filee
 
 @app.route('/')
 def home():
@@ -33,14 +45,23 @@ def upload():
 
     # Instantiate your form class
 
+    up_form = UploadForm()
+
     # Validate file upload on submit
     if request.method == 'POST':
+        if up_form.validate_on_submit():
+
         # Get file data and save to your uploads folder
+    
+            photo = up_form.photo.data
 
-        flash('File Saved', 'success')
+            filename = secure_filename(photo.filename) # escape illegal/special characters persons can use in the form name. Mitigate certain types of attacks
+            photo.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            flash('File Saved', 'success')
         return redirect(url_for('home'))
+    flash_errors(up_form)
 
-    return render_template('upload.html')
+    return render_template('upload.html', form=up_form)
 
 
 @app.route('/login', methods=['POST', 'GET'])
@@ -55,6 +76,15 @@ def login():
             flash('You were logged in', 'success')
             return redirect(url_for('upload'))
     return render_template('login.html', error=error)
+
+@app.route('/uploads/ <filename>')
+def get_image(filename):
+    return send_from_directory(os.path.join(os.getcwd(),app.config['UPLOAD_FOLDER']), filename)
+
+@app.route('/files')
+def files():
+    images = get_uploaded_images()
+    return render_template('files.html', images=images)
 
 
 @app.route('/logout')
